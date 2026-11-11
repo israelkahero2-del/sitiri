@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; manifest-src 'self'; worker-src 'self'; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<title>Sitiri: cover the names before you share a document</title>
+<meta name="description" content="Sitiri swaps names, addresses and numbers in a Word document, PDF or scan for placeholders, then puts them back after review. It runs in your browser, so the document never leaves your computer.">
+<meta name="theme-color" content="#0B4F4B">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/icon-64.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="sitiri.css">
+<style>
+.kanga{padding:22px;background-color:var(--ink);background-image:radial-gradient(circle at center,var(--saffron) 3.5px,transparent 4.2px);background-size:22px 22px;background-repeat:round}
+.kanga-line{padding:8px;background:var(--saffron)}
+.kanga-field{background:var(--teal);color:var(--paper)}
+.nav{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px 28px;padding-top:14px}
+.nav a{display:inline-flex;align-items:center;min-height:44px;text-decoration:none}
+.nav a:hover{text-decoration:underline}
+.hero{display:flex;flex-direction:column;align-items:center;gap:28px;padding-top:8px;padding-bottom:56px;text-align:center}
+.wordmark{margin:0;display:flex;justify-content:center;font-family:var(--display);font-weight:800;font-size:clamp(84px,21vw,290px);line-height:.92;letter-spacing:-.04em}
+.wordmark .mid{position:relative;display:inline-block}
+.wordmark .cover{position:absolute;left:-1%;right:-1%;top:20%;bottom:10%;background:var(--saffron);transform:scaleX(1);transform-origin:right center;transition:transform 900ms cubic-bezier(.2,.7,.2,1)}
+.is-covered .wordmark .cover{transform:scaleX(0)}
+.jina{display:flex;flex-direction:column;align-items:center;gap:10px}
+.jina-strip{margin:0;padding:12px 28px;background:var(--saffron);color:var(--ink);font-size:clamp(14px,1.7vw,20px);font-weight:700;letter-spacing:.1em}
+.jina-en{margin:0;font-size:17px;font-style:italic}
+.tagline{margin:8px 0 0;max-width:22em;font-family:var(--display);font-weight:700;font-size:clamp(26px,3.3vw,42px);line-height:1.15;letter-spacing:-.015em}
+
+h2{margin:0 0 18px;font-family:var(--display);font-weight:800;font-size:clamp(36px,5vw,68px);line-height:1;letter-spacing:-.03em}
+h3{margin:0 0 6px;font-size:23px;line-height:1.2}
+.split{display:flex;flex-wrap:wrap;align-items:center;gap:48px 64px;padding-top:96px;padding-bottom:96px}
+.split-text{flex:1 1 380px;min-width:0}
+.split-text p{margin:0 0 26px;max-width:30em;font-size:20px}
+.split-demo{flex:1 1 480px;min-width:0}
+.sheet{background:var(--sheet);border:3px solid var(--line);padding:34px 36px 32px}
+.sheet-title{margin:0 0 14px;font-size:14px;font-weight:700;letter-spacing:.04em}
+.sheet-text{margin:0;font-size:18px;line-height:2.05}
+.term{position:relative;display:inline-block;white-space:nowrap}
+.term .band{position:absolute;inset:3px -3px;display:flex;align-items:center;justify-content:center;background:var(--band-bg);color:var(--band-fg);font-size:15px;font-weight:700;line-height:1;transform:scaleX(0);transform-origin:left center;transition:transform 600ms cubic-bezier(.2,.7,.2,1)}
+.is-covered .term .band{transform:scaleX(1)}
+.term:nth-of-type(2) .band{transition-delay:90ms}
+.term:nth-of-type(3) .band{transition-delay:180ms}
+.term:nth-of-type(4) .band{transition-delay:270ms}
+.term:nth-of-type(5) .band{transition-delay:360ms}
+.caption{margin:12px 0 0;font-size:15px;color:var(--soft)}
+
+.how{background:var(--saffron);color:var(--ink)}
+.how-in{padding-top:88px;padding-bottom:88px}
+.how h2{margin-bottom:40px}
+.steps{display:flex;flex-wrap:wrap;gap:36px 48px;margin:0;padding:0;list-style:none}
+.steps li{flex:1 1 260px;min-width:0}
+.steps .num{display:block;margin:0 0 4px;font-family:var(--display);font-weight:800;font-size:128px;line-height:.9;letter-spacing:-.04em}
+.steps h3{font-size:24px;margin-bottom:8px}
+.steps p{margin:0}
+
+.privacy{background:var(--ink);color:var(--paper)}
+.privacy-in{padding-top:104px;padding-bottom:96px}
+.privacy h2{margin-bottom:56px;max-width:12em;font-size:clamp(42px,7.4vw,108px);line-height:.98;letter-spacing:-.035em}
+.facts{display:flex;flex-wrap:wrap;gap:28px 48px}
+.facts div{flex:1 1 260px;min-width:0;border-top:4px solid var(--saffron);padding-top:16px}
+.facts h3{font-size:22px;color:var(--saffron)}
+.facts p{margin:0}
+
+.org{padding-top:96px;padding-bottom:96px}
+.org h2{margin-bottom:14px}
+.org-lead{margin:0 0 40px;max-width:34em;font-size:20px}
+.org-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(440px,100%),1fr));gap:32px 48px;margin-bottom:44px}
+.org-grid div{border-top:6px solid var(--accent);padding-top:16px}
+.org-grid p{margin:0}
+.org .button{background:var(--teal);color:var(--paper)}
+.contact{margin:12px 0 0;font-size:16px;color:var(--soft)}
+@media (max-width:520px){.kanga{padding:11px;background-size:11px 11px}.sheet{padding:22px 20px}.steps .num{font-size:96px}}
+</style>
+</head>
+<body>
+
+<div class="kanga">
+<div class="kanga-line">
+<div class="kanga-field">
+<div class="teeth-down" aria-hidden="true"></div>
+<header class="wrap">
+<nav class="nav" aria-label="Main">
+<a href="#how">How it works</a>
+<a href="#privacy">Privacy</a>
+<a href="#organizations">For organizations</a>
+</nav>
+</header>
+<div class="wrap hero">
+<h1 class="wordmark" aria-label="Sitiri"><span aria-hidden="true">S</span><span class="mid" aria-hidden="true">itir<span class="cover"></span></span><span aria-hidden="true">i</span></h1>
+<div class="jina">
+<p class="jina-strip" lang="sw">SIRI YA MTUNGI AIJUAYE KATA</p>
+<p class="jina-en">The secret of the pot is known by the ladle.</p>
+</div>
+<p class="tagline">Cover the names. Share the document. Put them back.</p>
+<a class="button saffron big" href="tool.html">Open Sitiri</a>
+</div>
+<div class="teeth-up" aria-hidden="true"></div>
+</div>
+</div>
+</div>
+
+<main>
+<section class="wrap split">
+<div class="split-text">
+<h2>A band goes over every name.</h2>
+<p>Sitiri finds names, addresses and numbers and covers each with a placeholder. Your key lifts them off again when the review returns.</p>
+<button type="button" class="button" id="demo-toggle" aria-pressed="false">Cover the names</button>
+</div>
+<div class="split-demo">
+<div class="sheet">
+<p class="sheet-title">Lease</p>
+<p class="sheet-text">This Lease is made between <span class="term">Baraka Estates Limited<span class="band" aria-hidden="true">[Company 1]</span></span> of <span class="term">P.O. Box 1234-00100<span class="band" aria-hidden="true">[Address 1]</span></span>, Nairobi (the Lessor) and <span class="term">Amani Wanjiku<span class="band" aria-hidden="true">[Person 1]</span></span> (the Lessee). The Lessor is the registered proprietor of <span class="term">LR No. 209/4567<span class="band" aria-hidden="true">[Land Ref 1]</span></span>. Notices to the Lessee go to <span class="term">amani@example.co.ke<span class="band" aria-hidden="true">[Email 1]</span></span>.</p>
+</div>
+<p class="caption">An invented example. It repeats until you press the button.</p>
+</div>
+</section>
+
+<section class="how" id="how">
+<div class="wrap how-in">
+<h2>How it works</h2>
+<ol class="steps">
+<li><span class="num" aria-hidden="true">1</span><h3>Redact on your computer</h3><p>Choose a Word document, a PDF or a scan. Sitiri lists the names, addresses and numbers it finds. You add anything it missed.</p></li>
+<li><span class="num" aria-hidden="true">2</span><h3>Share the redacted copy</h3><p>Send the copy with placeholders for review. Save your key and keep it to yourself.</p></li>
+<li><span class="num" aria-hidden="true">3</span><h3>Restore with your key</h3><p>Load the key and the reviewed document. Sitiri puts every name back, with comments and tracked changes intact.</p></li>
+</ol>
+</div>
+</section>
+
+<section class="privacy" id="privacy">
+<div class="wrap privacy-in">
+<h2>Your documents never leave your computer.</h2>
+<div class="facts">
+<div><h3>No uploads</h3><p>Sitiri works inside your browser. Nothing you load is sent anywhere.</p></div>
+<div><h3>Works offline</h3><p>Once you have opened Sitiri, it works without an internet connection.</p></div>
+<div><h3>You keep the key</h3><p>The list that links placeholders to real names is saved only where you put it.</p></div>
+</div>
+</div>
+</section>
+
+<section class="wrap org" id="organizations">
+<h2>Fitted to your organization</h2>
+<p class="org-lead">The public tool is free. For an organization, Sitiri is set up around the way you work.</p>
+<div class="org-grid">
+<div><h3>A house list</h3><p>Your entities, people and addresses are hidden every time, without anyone typing them.</p></div>
+<div><h3>Your number formats</h3><p>File references, staff numbers, policy numbers or patient numbers.</p></div>
+<div><h3>A written procedure</h3><p>When staff may use AI on documents, and how.</p></div>
+<div><h3>Training</h3><p>A session for your team, and for new joiners after that.</p></div>
+</div>
+<a class="button big" href="mailto:[YOUR EMAIL]?subject=Sitiri%20setup">Ask about a setup</a>
+<p class="contact">[YOUR EMAIL]</p>
+</section>
+</main>
+
+<div class="dots" aria-hidden="true"></div>
+<footer class="foot">
+<div class="wrap foot-in">
+<div>
+<p>Sitiri reduces what you share. It can miss things, so read the preview before you send anything.</p>
+<p>Sitiri means "to conceal" in Swahili.</p>
+</div>
+<div class="foot-links">
+<a href="terms.html">Terms of use</a>
+<a href="terms.html#privacy">Privacy</a>
+<p>&copy; 2026 [YOUR NAME]</p>
+</div>
+</div>
+</footer>
+
+<script>
+(function(){
+  var root=document.documentElement,btn=document.getElementById('demo-toggle'),manual=false,timer;
+  function set(on){root.classList.toggle('is-covered',on);btn.textContent=on?'Restore the names':'Cover the names';btn.setAttribute('aria-pressed',on?'true':'false');}
+  function step(){if(manual)return;var next=!root.classList.contains('is-covered');set(next);timer=setTimeout(step,next?3600:2200);}
+  if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches){manual=true;set(true);}
+  else{timer=setTimeout(step,900);}
+  btn.addEventListener('click',function(){manual=true;clearTimeout(timer);set(!root.classList.contains('is-covered'));});
+  if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; manifest-src 'self'; worker-src 'self'; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<title>Terms of use and privacy | Sitiri</title>
+<meta name="theme-color" content="#0B4F4B">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/icon-64.png">
+<link rel="stylesheet" href="sitiri.css">
+<style>
+.top{background:var(--teal);color:var(--paper)}
+.top-in{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 24px;padding-top:14px;padding-bottom:14px}
+.mark{font-family:var(--display);font-weight:800;font-size:40px;line-height:1;letter-spacing:-.03em;text-decoration:none;display:inline-flex;align-items:center;min-height:44px}
+.top a.back{display:inline-flex;align-items:center;min-height:44px}
+.doc{max-width:760px;margin:0 auto;padding:56px 24px 88px}
+.doc h1{margin:0 0 8px;font-family:var(--display);font-weight:800;font-size:clamp(36px,6vw,60px);line-height:1;letter-spacing:-.03em}
+.doc h2{margin:44px 0 10px;font-family:var(--display);font-weight:700;font-size:28px;line-height:1.15;letter-spacing:-.01em}
+.doc p,.doc li{margin:0 0 12px}
+.doc ul{margin:0 0 12px;padding-left:22px}
+.updated{color:var(--soft)}
+</style>
+</head>
+<body>
+<div class="dots" aria-hidden="true"></div>
+<header class="top">
+<div class="wrap top-in">
+<a class="mark" href="index.html">Sitiri</a>
+<a class="back" href="tool.html">Open Sitiri</a>
+</div>
+<div class="teeth-up" aria-hidden="true"></div>
+</header>
+
+<main class="doc">
+<h1>Terms of use and privacy</h1>
+<p class="updated">Last updated: 11 November 2026</p>
+
+<h2>What Sitiri does</h2>
+<p>Sitiri replaces names and other identifying details in a document with placeholders, and puts them back later using a key that you save. It is a tool to help you share less. It is offered by [YOUR NAME].</p>
+
+<h2 id="privacy">Privacy</h2>
+<p>Sitiri runs inside your browser, on your own computer.</p>
+<ul>
+<li>Your documents, your pasted text and your keys are not sent to us or to anyone else. We never receive, see or store them.</li>
+<li>Sitiri has no accounts, no advertising and no visitor tracking.</li>
+<li>Once Sitiri has loaded, it works with the internet switched off.</li>
+<li>The company that hosts this website may record technical details of visits, such as IP addresses, as any web host does. Sitiri itself collects nothing.</li>
+</ul>
+
+<h2>It can miss things</h2>
+<ul>
+<li>Sitiri does not promise to find every identifying detail. Names without a title, place names, amounts and text inside pictures are easy to miss.</li>
+<li>When Sitiri reads a scan or a photo, it can misread words and numbers. A misread name will not be hidden. You must compare the text with the page before you go on.</li>
+<li>You are responsible for reading the preview and checking the redacted document before you share it.</li>
+<li>A redacted document is not anonymous. Its facts may still point to the people or organizations involved, and anyone holding the key can reverse the placeholders.</li>
+<li>Using Sitiri does not, by itself, make your use of an AI service or any other service lawful or compliant. That depends on your own obligations.</li>
+<li>Nothing on this site is legal advice.</li>
+</ul>
+
+<h2>Your key</h2>
+<ul>
+<li>Keep the key private and separate from the redacted document.</li>
+<li>If you lose the key, Sitiri cannot restore the document. We cannot recover it for you, because we never had it.</li>
+</ul>
+
+<h2>No warranty</h2>
+<p>Sitiri is provided as it is, without warranties of any kind. To the extent the law allows, [YOUR NAME] is not liable for loss arising from its use, including loss caused by an identifying detail that was not hidden.</p>
+
+<h2>Open-source components</h2>
+<p>Sitiri includes JSZip (MIT license), pako (MIT license), PDF.js (Apache License 2.0) and Tesseract.js with the Tesseract engine and its English language data (Apache License 2.0). The typefaces are Atkinson Hyperlegible and Bricolage Grotesque, both under the SIL Open Font License. The full notices are in the <a href="LICENSES.txt">license file</a>.</p>
+
+<h2>Contact</h2>
+<p>[YOUR EMAIL]</p>
+</main>
+
+<div class="dots" aria-hidden="true"></div>
+<footer class="foot">
+<div class="wrap foot-in">
+<div><p>Sitiri means "to conceal" in Swahili.</p></div>
+<div class="foot-links"><a href="index.html">About Sitiri</a><p>&copy; 2026 [YOUR NAME]</p></div>
+</div>
+</footer>
+<script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}</script>
+</body>
+</html>

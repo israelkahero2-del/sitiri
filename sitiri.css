@@ -1,0 +1,49 @@
+/* Sitiri: shared styles. Fonts are stored with the site, so nothing loads from elsewhere. */
+@font-face{font-family:"Atkinson Hyperlegible";font-style:normal;font-weight:400;font-display:swap;src:url("fonts/atkinson-hyperlegible-latin-400-normal.woff2") format("woff2")}
+@font-face{font-family:"Atkinson Hyperlegible";font-style:italic;font-weight:400;font-display:swap;src:url("fonts/atkinson-hyperlegible-latin-400-italic.woff2") format("woff2")}
+@font-face{font-family:"Atkinson Hyperlegible";font-style:normal;font-weight:700;font-display:swap;src:url("fonts/atkinson-hyperlegible-latin-700-normal.woff2") format("woff2")}
+@font-face{font-family:"Bricolage Grotesque";font-style:normal;font-weight:200 800;font-display:swap;src:url("fonts/bricolage-grotesque-latin-wght-normal.woff2") format("woff2")}
+
+:root{
+  --ink:#13233A; --teal:#0B4F4B; --saffron:#F4B62A; --paper:#F6F8F7;
+  --page:#F6F8F7; --text:#13233A; --soft:#33435A; --sheet:#FFFFFF; --rule:#C3D0D6; --line:#13233A;
+  --accent:#0B4F4B; --band-bg:#13233A; --band-fg:#F4B62A;
+  --btn-bg:#13233A; --btn-fg:#F6F8F7;
+  --warn-bg:#FFF1CC; --warn-fg:#13233A; --ok-bg:#DDEFEA; --ok-fg:#0B3B38; --bad-bg:#FBE1DD; --bad-fg:#7A1A10;
+  --display:"Bricolage Grotesque","Atkinson Hyperlegible",system-ui,sans-serif;
+  --body:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --page:#0C1524; --text:#EEF2F1; --soft:#B9C5CF; --sheet:#152238; --rule:#3A4A61; --line:#8C9BB0;
+    --accent:#F4B62A; --band-bg:#F4B62A; --band-fg:#13233A;
+    --btn-bg:#F4B62A; --btn-fg:#13233A;
+    --warn-bg:#4A3A0A; --warn-fg:#FFE9A8; --ok-bg:#123A35; --ok-fg:#BFE8DF; --bad-bg:#4A1F1B; --bad-fg:#FFC9C2;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--page);color:var(--text);font-family:var(--body);font-size:18px;line-height:1.55}
+a{color:inherit}
+:focus-visible{outline:3px solid var(--saffron);outline-offset:3px}
+.wrap{max-width:1160px;margin:0 auto;padding-left:24px;padding-right:24px}
+
+/* Kanga borders */
+.dots{height:22px;background-color:var(--ink);background-image:radial-gradient(circle at center,var(--saffron) 3.5px,transparent 4.2px);background-size:22px 22px;background-repeat:round}
+.teeth-down{height:14px;background-color:var(--teal);background-image:linear-gradient(135deg,var(--saffron) 25%,transparent 25%),linear-gradient(225deg,var(--saffron) 25%,transparent 25%);background-size:28px 28px}
+.teeth-up{height:14px;background-color:var(--teal);background-image:linear-gradient(45deg,var(--saffron) 25%,transparent 25%),linear-gradient(315deg,var(--saffron) 25%,transparent 25%);background-size:28px 28px;background-position:left bottom}
+
+/* Buttons */
+.button{display:inline-flex;align-items:center;justify-content:center;min-height:52px;padding:0 28px;border:0;border-radius:4px;background:var(--btn-bg);color:var(--btn-fg);font:inherit;font-size:19px;font-weight:700;text-decoration:none;cursor:pointer}
+.button.saffron{background:var(--saffron);color:var(--ink)}
+.button.big{min-height:58px;padding:0 34px;font-size:21px}
+
+/* Footer */
+.foot{background:var(--teal);color:var(--paper)}
+.foot-in{display:flex;flex-wrap:wrap;justify-content:space-between;gap:20px 40px;padding-top:40px;padding-bottom:52px}
+.foot p{margin:0 0 8px}
+.foot-links{display:flex;flex-wrap:wrap;align-items:center;gap:8px 24px}
+.foot-links a{display:inline-flex;align-items:center;min-height:44px}
+.foot-links p{margin:0}
+
+@media (prefers-reduced-motion:reduce){*{transition:none !important;animation:none !important}}
