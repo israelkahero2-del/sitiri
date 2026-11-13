@@ -102,6 +102,81 @@ async function pageText(page) {
   return { paras: linesToParas(out), chars: chars };
 }
 
+/* ---------- what kind of page is this, and is the scan good enough? ---------- */
+// Finds the largest picture on a PDF page: how much of the page it covers and how many dots per inch it holds.
+async function pageImageInfo(page, pdfjs) {
+  var info = { cover: 0, dpi: 0, px: 0 };
+  try {
+    var ops = await page.getOperatorList(), O = pdfjs.OPS, view = page.view;
+    var pageArea = Math.abs((view[2] - view[0]) * (view[3] - view[1])) || 1;
+    var m = [1, 0, 0, 1, 0, 0], stack = [];
+    for (var i = 0; i < ops.fnArray.length; i++) {
+      var fn = ops.fnArray[i], a = ops.argsArray[i];
+      if (fn === O.save) stack.push(m.slice());
+      else if (fn === O.restore) { if (stack.length) m = stack.pop(); }
+      else if (fn === O.transform) m = [m[0] * a[0] + m[2] * a[1], m[1] * a[0] + m[3] * a[1], m[0] * a[2] + m[2] * a[3], m[1] * a[2] + m[3] * a[3], m[0] * a[4] + m[2] * a[5] + m[4], m[1] * a[4] + m[3] * a[5] + m[5]];
+      else if (fn === O.paintImageXObject || fn === O.paintInlineImageXObject || fn === O.paintImageXObjectRepeat) {
+        var area = Math.abs(m[0] * m[3] - m[1] * m[2]), cover = area / pageArea;
+        if (cover > info.cover) {
+          info.cover = cover;
+          var wPts = Math.sqrt(m[0] * m[0] + m[1] * m[1]), px = fn === O.paintInlineImageXObject ? (a[0] && a[0].width) : a[1];
+          var hPts = Math.sqrt(m[2] * m[2] + m[3] * m[3]), pxH = fn === O.paintInlineImageXObject ? (a[0] && a[0].height) : a[2];
+          var inches = Math.max(wPts, hPts) / 72;
+          info.px = Math.max(px || 0, pxH || 0);
+          // Phone scanning apps often give the page a made-up paper size, so dots per inch only mean something for a believable page.
+          info.dpi = px && wPts && inches >= 5 && inches <= 18 ? Math.round(px / (wPts / 72)) : 0;
+        }
+      }
+    }
+  } catch (e) {}
+  return info;
+}
+// A plain-words warning when a scan is too coarse or too faint to read well. Empty when the scan is fine.
+function scanWarning(canvas, dpi, longSidePx, words) {
+  var notes = [];
+  if (dpi && dpi < 180) notes.push('This page was scanned at about ' + dpi + ' dots per inch, which is too coarse to read reliably.');
+  else if (!dpi && longSidePx && longSidePx < 1500) notes.push('This picture is small (' + longSidePx + ' pixels on its long side), which is too coarse to read reliably.');
+  try {
+    var g = grayOf(canvas), hist = new Uint32Array(256), n = 0, i;
+    for (i = 0; i < g.length; i += 7) { hist[g[i]]++; n++; }
+    var acc = 0, ink = 0, paper = 255;
+    for (i = 0; i < 256; i++) { acc += hist[i]; if (acc >= n * 0.01) { ink = i; break; } }
+    for (acc = 0, i = 0; i < 256; i++) { acc += hist[i]; if (acc >= n * 0.8) { paper = i; break; } }
+    if (words >= 20 && paper > 60 && ink > paper * 0.6) notes.push('The print on this page is very faint.');
+  } catch (e) {}
+  return notes.length ? notes.join(' ') + ' If you can, scan it again at 300 dots per inch, in black and white or greyscale.' : '';
+}
+function realWords(text) {
+  var W = wordSet(), n = 0;
+  String(text).split(/\s+/).forEach(function (w) { var a = w.replace(/[^A-Za-z]/g, ''); if (a.length >= 3 && (!W || W.has(a.toLowerCase()))) n++; });
+  return n;
+}
+// Where two readings of the same page differ. Returns pairs: what the first says, what the second says.
+function disagreements(textA, textB) {
+  function toks(t) { return String(t).split(/\s+/).filter(Boolean).map(function (w) { return { w: w, k: w.toLowerCase().replace(/[^a-z0-9]/g, '') }; }).filter(function (x) { return x.k; }); }
+  var A = toks(textA), B = toks(textB), n = A.length, m = B.length;
+  if (!n || !m || n * m > 4e6) return [];
+  var L = new Array(n + 1), i, j;
+  for (i = 0; i <= n; i++) L[i] = new Uint16Array(m + 1);
+  for (i = n - 1; i >= 0; i--) for (j = m - 1; j >= 0; j--) L[i][j] = A[i].k === B[j].k ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  var out = [], a = [], b = [];
+  function flush() {
+    if (a.length && b.length && a.length <= 6 && b.length <= 6) {
+      var ka = a.map(function (x) { return x.k; }).join(''), kb = b.map(function (x) { return x.k; }).join('');
+      if (ka !== kb) out.push([a.map(function (x) { return x.w; }).join(' '), b.map(function (x) { return x.w; }).join(' ')]);
+    }
+    a = []; b = [];
+  }
+  i = 0; j = 0;
+  while (i < n && j < m) {
+    if (A[i].k === B[j].k) { flush(); i++; j++; }
+    else if (L[i + 1][j] >= L[i][j + 1]) a.push(A[i++]); else b.push(B[j++]);
+  }
+  while (i < n) a.push(A[i++]); while (j < m) b.push(B[j++]);
+  flush();
+  return out;
+}
+
 /* ---------- reading a scanned page ---------- */
 function canvasBlob(canvas) {
   return new Promise(function (res) { canvas.toBlob(function (b) { res(b); }, 'image/jpeg', 0.85); });
@@ -323,15 +398,26 @@ async function readFile(file, id) {
     for (var n = 1; n <= doc.numPages; n++) {
       if (id !== runId) { task.destroy(); return null; }
       status('ok', 'Reading page ' + n + ' of ' + doc.numPages + '.');
-      var page = await doc.getPage(n), t = await pageText(page);
-      if (t.chars >= 40) pages.push({ n: n, paras: t.paras, ocr: false });
-      else {
+      var page = await doc.getPage(n), t = await pageText(page), pic = await pageImageInfo(page, pdfjs);
+      if (t.chars >= 40 && pic.cover < 0.6) pages.push({ n: n, paras: t.paras, ocr: false });
+      else if (t.chars >= 40) {
+        // A scanned page that already carries text from the scanner. That text can be wrong, so it is checked like any scan.
+        status('ok', 'Page ' + n + ' of ' + doc.numPages + ' is a scan with text added by the scanner. Reading it a second time to compare.');
+        usedOcr = true;
+        var cv = await renderPage(page), bl = await canvasBlob(cv);
+        var own = await readScan(cv), warn1 = scanWarning(cv, pic.dpi, pic.dpi ? 0 : pic.px, own.total), layer = t.paras.join('\n\n'), mine = own.paras.join('\n\n');
+        var useLayer = realWords(layer) * 1.05 >= own.score;
+        pages.push({ n: n, ocr: true, blob: bl, warn: warn1, layer: true, usesLayer: useLayer,
+          paras: useLayer ? t.paras : own.paras, alt: useLayer ? mine : layer,
+          diffs: useLayer ? disagreements(layer, mine) : disagreements(mine, layer) });
+        cv.width = cv.height = 0;
+      } else {
         status('ok', 'Cleaning up and reading page ' + n + ' of ' + doc.numPages + ' as a scan. This takes several seconds a page.');
         usedOcr = true;
         var canvas = await renderPage(page);
         var blob = await canvasBlob(canvas);
-        var got = await readScan(canvas);
-        pages.push({ n: n, paras: got.paras, unsure: got.unsure, ocr: true, blob: blob });
+        var got = await readScan(canvas), warn2 = scanWarning(canvas, pic.dpi, pic.dpi ? 0 : pic.px, got.total);
+        pages.push({ n: n, paras: got.paras, unsure: got.unsure, ocr: true, blob: blob, warn: warn2 });
         canvas.width = canvas.height = 0;
       }
       page.cleanup();
@@ -340,8 +426,8 @@ async function readFile(file, id) {
   } else {
     status('ok', 'Cleaning up and reading the picture. This takes several seconds.');
     var c = await imageCanvas(file);
-    var one = await readScan(c);
-    pages.push({ n: 1, paras: one.paras, unsure: one.unsure, ocr: true, blob: file });
+    var one = await readScan(c), warn3 = scanWarning(c, 0, Math.max(c.width, c.height), one.total);
+    pages.push({ n: 1, paras: one.paras, unsure: one.unsure, ocr: true, blob: file, warn: warn3 });
   }
   await stopOcr();
   return pages;
@@ -380,9 +466,32 @@ window.startConvert = async function (file) {
       var wrap = document.createElement('div'); wrap.className = 'c-page';
       var img = document.createElement('img'); img.alt = 'Page ' + p.n + ' as scanned'; img.src = URL.createObjectURL(p.blob);
       var side = document.createElement('div');
-      var lab = document.createElement('label'); lab.textContent = 'Page ' + p.n + ': what Sitiri read'; lab.htmlFor = 'c-text-' + p.n;
+      var lab = document.createElement('label'); lab.htmlFor = 'c-text-' + p.n;
+      function label() { lab.textContent = 'Page ' + p.n + (p.layer ? (p.usesLayer ? ": the scanner's text" : ": what Sitiri read (the scanner's text looked worse)") : ': what Sitiri read'); }
+      label();
+      if (p.warn) { var w = document.createElement('p'); w.className = 'note warn c-warn'; w.textContent = p.warn; side.appendChild(w); }
       var ta = document.createElement('textarea'); ta.id = 'c-text-' + p.n; ta.value = p.paras.join('\n\n'); ta.spellcheck = false;
       side.appendChild(lab); side.appendChild(ta);
+      if (p.layer) {
+        var d = document.createElement('div'); d.className = 'c-unsure c-diff';
+        if (p.diffs.length) {
+          var other = p.usesLayer ? 'Sitiri read' : 'the scanner has';
+          d.appendChild(document.createTextNode('The two readings of this page disagree in ' + p.diffs.length + ' place(s). Check these against the page:'));
+          var ul = document.createElement('ul');
+          p.diffs.slice(0, 40).forEach(function (pair) {
+            var li = document.createElement('li'), b1 = document.createElement('b'); b1.textContent = pair[0];
+            li.appendChild(b1); li.appendChild(document.createTextNode(' \u2014 ' + other + ' \u201c' + pair[1] + '\u201d')); ul.appendChild(li);
+          });
+          d.appendChild(ul);
+          if (p.diffs.length > 40) d.appendChild(document.createTextNode('and ' + (p.diffs.length - 40) + ' more.'));
+        } else d.textContent = "Sitiri read this page too, and its reading matches the scanner's text.";
+        side.appendChild(d);
+        var swap = document.createElement('button'); swap.type = 'button'; swap.className = 'btn alt';
+        function swapLabel() { swap.textContent = p.usesLayer ? "Use Sitiri's reading instead" : "Use the scanner's text instead"; }
+        swapLabel();
+        swap.onclick = function () { var now = ta.value; ta.value = p.alt; p.alt = now; p.usesLayer = !p.usesLayer; swapLabel(); label(); d.classList.add('hide'); };
+        var srow = document.createElement('div'); srow.className = 'row'; srow.appendChild(swap); side.appendChild(srow);
+      }
       if (p.unsure && p.unsure.length) { var hint = document.createElement('p'); hint.className = 'c-unsure'; hint.textContent = 'Check these closely. Sitiri was least sure of: ' + p.unsure.join('   '); side.appendChild(hint); }
       var again = document.createElement('button'); again.type = 'button'; again.className = 'btn alt'; again.textContent = 'Read this page again, stronger clean-up';
       var first = null;
@@ -402,7 +511,8 @@ window.startConvert = async function (file) {
       wrap.appendChild(img); wrap.appendChild(side); box.appendChild(wrap);
       p.field = ta;
     });
-    status('warn', scans.length + ' page(s) were read as scans. Scan reading makes mistakes. Compare each page with its text and correct it, especially names and numbers, then press "Use this text".');
+    var layered = scans.filter(function (p) { return p.layer; }).length, poor = scans.filter(function (p) { return p.warn; }).length;
+    status('warn', scans.length + ' page(s) are scans.' + (layered ? ' ' + layered + ' came with text from the scanner, which Sitiri compared with its own reading.' : '') + (poor ? ' ' + poor + ' may be too coarse or faint to read well.' : '') + ' Scan reading makes mistakes. Compare each page with its text and correct it, especially names and numbers, then press "Use this text".');
     $('c-check').classList.remove('hide');
     $('c-accept').onclick = function () {
       scans.forEach(function (p) { p.paras = textToParas(p.field.value); });
