@@ -60,8 +60,9 @@ ol.how{padding-left:24px}ol.how li{margin-bottom:8px}
 .c-page{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin:16px 0;padding-top:16px;border-top:2px solid var(--rule)}
 .c-page img{display:block;width:100%;height:auto;border:2px solid var(--rule);background:#fff}
 .c-page label{display:block;margin-bottom:6px;font-weight:700}
-.c-page textarea{min-height:460px;height:calc(100% - 34px);font-size:16px;line-height:1.5}
-@media (max-width:760px){.c-page{grid-template-columns:1fr}.c-page textarea{height:auto}}
+.c-page>div{display:flex;flex-direction:column}
+.c-page textarea{flex:1 1 auto;min-height:460px;font-size:16px;line-height:1.5}
+@media (max-width:760px){.c-page{grid-template-columns:1fr}}
 .c-unsure{margin:8px 0 0;padding:8px 10px;background:var(--warn-bg);color:var(--warn-fg);font-size:15px;border-radius:4px;word-break:break-word}
 .house{margin:14px 0 4px;padding:10px 14px;border:2px solid var(--rule);border-radius:4px}
 .house summary{cursor:pointer;font-weight:700;min-height:32px}
@@ -74,7 +75,7 @@ ol.how{padding-left:24px}ol.how li{margin-bottom:8px}
 <div class="wrap top-in">
 <h1 class="mark"><a href="index.html" aria-label="Sitiri home">Sitiri</a></h1>
 <p class="promise">Runs on this computer only. Nothing you load is sent anywhere.</p>
-<span class="ver">Version 1.4</span>
+<span class="ver">Version 1.5</span>
 </div>
 <div class="teeth-up" aria-hidden="true"></div>
 </header>
@@ -218,7 +219,7 @@ ol.how{padding-left:24px}ol.how li{margin-bottom:8px}
     <h2>Good to know</h2>
     <ul>
       <li><b>PDFs:</b> Sitiri reads the text and gives you a redacted Word document. Tables, columns and pictures are not kept.</li>
-      <li><b>Scans and photos:</b> Sitiri reads the page with a scan reader and shows you the result beside the page. Correct it before you go on. Scan reading makes mistakes, and a misread name will not be hidden.</li>
+      <li><b>Scans and photos:</b> Sitiri straightens the page, cleans up shadows and grey paper, then reads it with a scan reader and shows you the result beside the page. If a page reads badly, try "Read this page again, stronger clean-up". Correct the text before you go on. Scan reading makes mistakes, and a misread name will not be hidden.</li>
       <li><b>Working offline:</b> the scan reader (about 7 MB) is fetched in the background the first time you open this page online. After that, scans can be read offline too.</li>
       <li><b>Pictures:</b> the tool cannot read text inside pictures, such as a letterhead, a stamp or a signature. Tick the box to blank them out.</li>
       <li><b>Short names:</b> if you hide "Eka Hotel Limited", add "Eka" as its own row too. The tool points out short names it still sees.</li>

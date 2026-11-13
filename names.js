@@ -259,7 +259,7 @@
   if (window.DETECT) {
     window.DETECT.push({ cat: 'Phone', re: /\(\d{3}\)[ \t]?\d{3}[ \t]?\d{3}(?!\d)/g });
     window.DETECT.push({ cat: 'Phone', re: /(?<![\dA-Za-z\/.,+])0[17]\d{2}[ \t\-]?\d{3}[ \t\-]?\d{3}(?!\d)/g });
-    window.DETECT.push({ cat: 'Coordinates', re: /(?<![\dA-Za-z.])-?\d{1,3}\.\d{4,}(?![\d.]*[A-Za-z])/g });
+    window.DETECT.push({ cat: 'Coordinates', re: /(?<![\dA-Za-z.])-?\d{1,3}\.\d{5,}(?![\d.]*[A-Za-z])/g });
     window.DETECT.push({ cat: 'Phone', re: /\+254(?:%20|\d){9,}/g });
     window.DETECT.push({ cat: 'Address', re: /\b(?:GPO|G\.P\.O\.?)[ \t]*\d{5}\b/g });
     window.DETECT.push({ cat: 'Website', re: /\bhttps?:\/\/[^\s<>()\[\]"'”]+[^\s<>()\[\]"'”.,;:!?]/g });

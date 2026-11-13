@@ -117,6 +117,17 @@ function fixOrdinals(text) {
   return text.replace(new RegExp('\\b(\\d{1,2})\\s?[\\u00ae\\u2122"*%\\u201c\\u201d\'\\u2019]{1,2}\\s+(?=(?:day|floor|' + MONTHS + ')\\b)', 'gi'), function (m, n) { return ordinal(n) + ' '; });
 }
 function pct(list, q) { var a = list.slice().sort(function (x, y) { return x - y; }); return a.length ? a[Math.min(a.length - 1, Math.floor(q * a.length))] : 0; }
+var wordsP = null;
+function wordSet() { if (!wordsP && window.SITIRI_WORDS) wordsP = new Set(window.SITIRI_WORDS.split('|')); return wordsP; }
+// Reads the cleaned-up page. If that reading is doubtful, reads the page as it is too, and keeps whichever has more real words.
+async function readScan(canvas) {
+  var cleaned = enhance(canvas, 'dark');
+  var a = await ocrCanvas(cleaned.canvas);
+  cleaned.canvas.width = cleaned.canvas.height = 0;
+  if (a.total >= 20 && a.score / a.total >= 0.9) return a;      // a clean reading: no need for a second look
+  var b = await ocrCanvas(canvas);
+  return b.score > a.score * 1.02 ? b : a;
+}
 async function ocrCanvas(canvas) {
   var worker = await getOcr();
   var r = await worker.recognize(canvas, {}, { text: true, blocks: true });
@@ -162,7 +173,12 @@ async function ocrCanvas(canvas) {
     });
     rows.push({ text: fixOrdinals(words.map(function (w) { return w.t; }).join(' ')), x0: words[0].x0, x1: words[words.length - 1].x1, y0: l.y0, y1: l.y1, h: l.h });
   });
-  if (!rows.length) return { paras: [], unsure: [] };
+  var W = wordSet(), score = 0, total = 0;
+  raw.forEach(function (l) { l.words.forEach(function (w) {
+    var a = w.t.replace(/[^A-Za-z]/g, ''); if (a.length < 3) return; total++; if (w.c < 60) return;
+    if (!W || W.has(a.toLowerCase())) score++;
+  }); });
+  if (!rows.length) return { paras: [], unsure: [], score: 0, total: total };
   var right = pct(rows.map(function (x) { return x.x1; }), 0.85), left = pct(rows.map(function (x) { return x.x0; }), 0.15), width = right - left;
   var lineH = pct(rows.map(function (x) { return x.h; }), 0.5);   // the usual line height on this page
   rows.forEach(function (row, i) {
@@ -170,11 +186,82 @@ async function ocrCanvas(canvas) {
     row.gap = prev ? (row.y0 - prev.y1) > 0.75 * lineH || row.y0 < prev.y0 - prev.h : false;
     row.short = width > 0 && (right - row.x1) > 0.12 * width && /[.:;!?]$/.test(row.text);
   });
-  return { paras: linesToParas(rows), unsure: unsure };
+  return { paras: linesToParas(rows), unsure: unsure, score: score, total: total };
 }
-async function renderPage(page) {
+/* ---------- the enhancer: cleans a scanned page before it is read ---------- */
+function grayOf(canvas) {
+  var w = canvas.width, h = canvas.height, d = canvas.getContext('2d').getImageData(0, 0, w, h).data, g = new Uint8ClampedArray(w * h);
+  for (var i = 0, j = 0; j < g.length; i += 4, j++) g[j] = (d[i] * 77 + d[i + 1] * 150 + d[i + 2] * 29) >> 8;
+  return g;
+}
+// The tilt of the page in degrees, found by trying small angles and keeping the one that makes the text lines sharpest.
+function findTilt(g, w, h) {
+  var step = Math.max(1, Math.round(w / 500)), sw = Math.floor(w / step), sh = Math.floor(h / step), pts = [], sum = 0, x, y;
+  for (y = 0; y < sh; y++) for (x = 0; x < sw; x++) sum += g[y * step * w + x * step];
+  var cut = (sum / (sw * sh)) * 0.72;
+  for (y = Math.floor(sh * 0.04); y < sh * 0.96; y++) for (x = Math.floor(sw * 0.06); x < sw * 0.94; x++) if (g[y * step * w + x * step] < cut) pts.push(x, y);
+  if (pts.length < 400) return 0;
+  function score(deg) {
+    var t = Math.tan(deg * Math.PI / 180), rows = new Float64Array(sh + sw), n = 0, s = 0;
+    for (var i = 0; i < pts.length; i += 2) rows[Math.round(pts[i + 1] + pts[i] * t) + (sw >> 1)]++;
+    for (i = 1; i < rows.length; i++) { var dlt = rows[i] - rows[i - 1]; s += dlt * dlt; }
+    return s;
+  }
+  var best = 0, bestS = score(0), a, sc;
+  for (a = -5; a <= 5; a += 0.5) { sc = score(a); if (sc > bestS) { bestS = sc; best = a; } }
+  var mid = best;
+  for (a = mid - 0.4; a <= mid + 0.4; a += 0.1) { sc = score(a); if (sc > bestS) { bestS = sc; best = a; } }
+  return bestS > score(0) * 1.08 ? best : 0;
+}
+function rotated(canvas, deg) {
+  var out = document.createElement('canvas'); out.width = canvas.width; out.height = canvas.height;
+  var c = out.getContext('2d'); c.fillStyle = '#fff'; c.fillRect(0, 0, out.width, out.height);
+  c.translate(out.width / 2, out.height / 2); c.rotate(deg * Math.PI / 180); c.drawImage(canvas, -canvas.width / 2, -canvas.height / 2);
+  return out;
+}
+// Evens out the paper (shadows, grey or yellowed background) and darkens the print.
+// mode 'clean' keeps soft edges; mode 'strong' turns the page to pure black on white for faint or patchy print.
+function enhance(canvas, mode) {
+  var g = grayOf(canvas), w = canvas.width, h = canvas.height;
+  var tilt = findTilt(g, w, h);
+  if (Math.abs(tilt) >= 0.3) { canvas = rotated(canvas, tilt); g = grayOf(canvas); }
+  var B = Math.max(16, Math.round(Math.max(w, h) / 90)), bw = Math.ceil(w / B), bh = Math.ceil(h / B), bg = new Float32Array(bw * bh), x, y, i;
+  for (var by = 0; by < bh; by++) for (var bx = 0; bx < bw; bx++) {
+    var hist = new Uint32Array(256), n = 0, y1 = Math.min(h, (by + 1) * B), x1 = Math.min(w, (bx + 1) * B);
+    for (y = by * B; y < y1; y += 2) for (x = bx * B; x < x1; x += 2) { hist[g[y * w + x]]++; n++; }
+    var need = n * 0.2, v = 255; while (v > 0 && (need -= hist[v]) > 0) v--;     // the paper: the brightest fifth of the block
+    bg[by * bw + bx] = v;
+  }
+  for (var pass = 0; pass < 2; pass++) {                                           // smooth the paper map
+    var nb = new Float32Array(bw * bh);
+    for (by = 0; by < bh; by++) for (bx = 0; bx < bw; bx++) {
+      var s = 0, c = 0;
+      for (var dy = -1; dy <= 1; dy++) for (var dx = -1; dx <= 1; dx++) { var yy = by + dy, xx = bx + dx; if (yy >= 0 && yy < bh && xx >= 0 && xx < bw) { s += bg[yy * bw + xx]; c++; } }
+      nb[by * bw + bx] = s / c;
+    }
+    bg = nb;
+  }
+  var out = document.createElement('canvas'); out.width = w; out.height = h;
+  var ctx = out.getContext('2d'), img = ctx.createImageData(w, h), d = img.data, strong = mode === 'strong';
+  for (y = 0; y < h; y++) {
+    var fy = Math.min(bh - 1, Math.max(0, (y - B / 2) / B)), y0 = Math.floor(fy), y1b = Math.min(bh - 1, y0 + 1), ty = fy - y0;
+    for (x = 0; x < w; x++) {
+      var fx = Math.min(bw - 1, Math.max(0, (x - B / 2) / B)), x0 = Math.floor(fx), x1b = Math.min(bw - 1, x0 + 1), tx = fx - x0;
+      var paper = (bg[y0 * bw + x0] * (1 - tx) + bg[y0 * bw + x1b] * tx) * (1 - ty) + (bg[y1b * bw + x0] * (1 - tx) + bg[y1b * bw + x1b] * tx) * ty;
+      if (paper < 90) paper = 90;
+      var r = g[y * w + x] / paper, val;                                           // 1 = paper, 0 = ink
+      if (strong) val = r < 0.72 ? 0 : 255;
+      else if (mode === 'dark') { r = (r - 0.3) / 0.62; val = r <= 0 ? 0 : r >= 1 ? 255 : Math.round(255 * Math.pow(r, 2.4)); }
+      else { r = (r - 0.35) / 0.55; val = r <= 0 ? 0 : r >= 1 ? 255 : Math.round(255 * Math.pow(r, 1.3)); }
+      i = (y * w + x) * 4; d[i] = d[i + 1] = d[i + 2] = val; d[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return { canvas: out, tilt: tilt };
+}
+async function renderPage(page, target) {
   var base = page.getViewport({ scale: 1 });
-  var scale = Math.max(0.75, Math.min(3, 3000 / Math.max(base.width, base.height)));
+  var scale = Math.max(0.75, Math.min(target ? 6 : 3, (target || 3000) / Math.max(base.width, base.height)));
   var vp = page.getViewport({ scale: scale });
   var canvas = document.createElement('canvas');
   canvas.width = Math.ceil(vp.width); canvas.height = Math.ceil(vp.height);
@@ -239,11 +326,11 @@ async function readFile(file, id) {
       var page = await doc.getPage(n), t = await pageText(page);
       if (t.chars >= 40) pages.push({ n: n, paras: t.paras, ocr: false });
       else {
-        status('ok', 'Reading page ' + n + ' of ' + doc.numPages + ' as a scan. This takes a few seconds a page.');
+        status('ok', 'Cleaning up and reading page ' + n + ' of ' + doc.numPages + ' as a scan. This takes several seconds a page.');
         usedOcr = true;
         var canvas = await renderPage(page);
         var blob = await canvasBlob(canvas);
-        var got = await ocrCanvas(canvas);
+        var got = await readScan(canvas);
         pages.push({ n: n, paras: got.paras, unsure: got.unsure, ocr: true, blob: blob });
         canvas.width = canvas.height = 0;
       }
@@ -251,9 +338,9 @@ async function readFile(file, id) {
     }
     await task.destroy();
   } else {
-    status('ok', 'Reading the picture. This takes a few seconds.');
+    status('ok', 'Cleaning up and reading the picture. This takes several seconds.');
     var c = await imageCanvas(file);
-    var one = await ocrCanvas(c);
+    var one = await readScan(c);
     pages.push({ n: 1, paras: one.paras, unsure: one.unsure, ocr: true, blob: file });
   }
   await stopOcr();
@@ -297,6 +384,21 @@ window.startConvert = async function (file) {
       var ta = document.createElement('textarea'); ta.id = 'c-text-' + p.n; ta.value = p.paras.join('\n\n'); ta.spellcheck = false;
       side.appendChild(lab); side.appendChild(ta);
       if (p.unsure && p.unsure.length) { var hint = document.createElement('p'); hint.className = 'c-unsure'; hint.textContent = 'Check these closely. Sitiri was least sure of: ' + p.unsure.join('   '); side.appendChild(hint); }
+      var again = document.createElement('button'); again.type = 'button'; again.className = 'btn alt'; again.textContent = 'Read this page again, stronger clean-up';
+      var first = null;
+      again.onclick = async function () {
+        if (first !== null) { ta.value = first; first = null; again.textContent = 'Read this page again, stronger clean-up'; return; }
+        again.disabled = true; again.textContent = 'Reading again\u2026';
+        try {
+          var bmp = await createImageBitmap(p.blob), c2 = document.createElement('canvas');
+          c2.width = bmp.width; c2.height = bmp.height; c2.getContext('2d').drawImage(bmp, 0, 0);
+          var e2 = enhance(c2, 'strong'), got2 = await ocrCanvas(e2.canvas);
+          await stopOcr();
+          first = ta.value; ta.value = got2.paras.join('\n\n'); again.textContent = 'Go back to the first reading';
+        } catch (err) { again.textContent = 'Could not read it again'; }
+        again.disabled = false;
+      };
+      var arow = document.createElement('div'); arow.className = 'row'; arow.appendChild(again); side.appendChild(arow);
       wrap.appendChild(img); wrap.appendChild(side); box.appendChild(wrap);
       p.field = ta;
     });
@@ -317,6 +419,7 @@ window.startConvert = async function (file) {
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.ready.then(function (reg) { if (reg.active) reg.active.postMessage('warm'); }).catch(function () {});
 }
+window.__scan = { loadPdfjs: loadPdfjs, getOcr: getOcr, stopOcr: stopOcr, renderPage: renderPage, enhance: enhance, ocrCanvas: ocrCanvas, readScan: readScan };
 window.resetConvert = function () { runId++; stopOcr(); clearCheck(); $('c-panel').classList.add('hide'); };
 
 /* Extra search patterns. Scan reading often turns "ID" into "1D", and real documents name
