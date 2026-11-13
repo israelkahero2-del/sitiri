@@ -63,6 +63,9 @@ ol.how{padding-left:24px}ol.how li{margin-bottom:8px}
 .c-page textarea{min-height:460px;height:calc(100% - 34px);font-size:16px;line-height:1.5}
 @media (max-width:760px){.c-page{grid-template-columns:1fr}.c-page textarea{height:auto}}
 .c-unsure{margin:8px 0 0;padding:8px 10px;background:var(--warn-bg);color:var(--warn-fg);font-size:15px;border-radius:4px;word-break:break-word}
+.house{margin:14px 0 4px;padding:10px 14px;border:2px solid var(--rule);border-radius:4px}
+.house summary{cursor:pointer;font-weight:700;min-height:32px}
+.house p{margin:10px 0 6px;font-size:16px}
 </style>
 </head>
 <body>
@@ -71,7 +74,7 @@ ol.how{padding-left:24px}ol.how li{margin-bottom:8px}
 <div class="wrap top-in">
 <h1 class="mark"><a href="index.html" aria-label="Sitiri home">Sitiri</a></h1>
 <p class="promise">Runs on this computer only. Nothing you load is sent anywhere.</p>
-<span class="ver">Version 1.3</span>
+<span class="ver">Version 1.4</span>
 </div>
 <div class="teeth-up" aria-hidden="true"></div>
 </header>
@@ -115,6 +118,7 @@ ol.how{padding-left:24px}ol.how li{margin-bottom:8px}
       <button class="btn" id="r-suggest">Find likely identifiers</button>
       <button class="btn alt" id="r-add">Add a row</button>
       <button class="btn alt" id="r-loadkey-btn">Load a saved key</button>
+      <button class="btn alt" id="h-save" type="button">Save ticked rows to my house list</button>
       <input type="file" id="r-loadkey" accept=".json" class="hide">
     </div>
     <div class="tablewrap">
@@ -194,7 +198,8 @@ ol.how{padding-left:24px}ol.how li{margin-bottom:8px}
     <h2>Before you send a document</h2>
     <ol class="how">
       <li>Open the <b>Redact</b> tab and choose the document: Word, PDF, a scan or a photo of a page.</li>
-      <li>Click <b>Find likely identifiers</b>. Untick anything that does not need hiding.</li>
+      <li>Click <b>Find likely identifiers</b>. Untick anything that does not need hiding. Rows that arrive unticked are capitalized words that may be names or places: tick the ones that matter.</li>
+      <li>For names you hide every time, tick them and click <b>Save ticked rows to my house list</b>. They are kept in this browser on this computer.</li>
       <li>Click <b>Add a row</b> for anything the search missed, such as a person's name or a place.</li>
       <li>Click <b>Redact</b>, then read the preview.</li>
       <li>Click <b>Download the redacted document</b> and <b>Save the key</b>.</li>
@@ -603,14 +608,14 @@ $('r-suggest').addEventListener('click',function(){
   if(!lines.join('').trim()){note($('r-msg'),'bad','Choose a document or paste some text first.');return;}
   note($('r-msg'),'','');
   var n=0;
-  detect(lines).forEach(function(d){if(!hasTerm(d.term)){addRow(d.term,d.cat);n++;}});
+  var maybe=0;(window.findAll?findAll(lines):detect(lines)).forEach(function(d){if(!hasTerm(d.term)){addRow(d.term,d.cat,null,d.on);n++;if(d.on===false)maybe++;}});
   if(state.src&&mode('rmode')==='file'){
     Object.keys(state.src.info.authors).forEach(function(a){
       if(a.length>2&&!/^(author|python-docx|microsoft office user|user)$/i.test(a)&&!hasTerm(a)){addRow(a,'Person');n++;}
     });
   }
   recount();
-  note($('r-msg'),n?'ok':'warn',n?('Added '+n+' row(s). Untick any you do not need, and add anything that is missing.'):'Nothing new was found. Add rows by hand.');
+  note($('r-msg'),n?'ok':'warn',n?('Added '+n+' row(s). Untick any you do not need, and add anything that is missing.'+(maybe?' The last '+maybe+' are unticked: they are capitalized words that may be names or places. Tick the ones that need hiding.':'')):'Nothing new was found. Add rows by hand.');
 });
 function activePairs(){
   var rows=state.rows.filter(function(r){return r.on&&r.term.trim();});
@@ -804,5 +809,7 @@ renderRows();
 if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}
 </script>
 <script src="convert.js"></script>
+<script src="words.js"></script>
+<script src="names.js"></script>
 </body>
 </html>
